@@ -180,7 +180,3 @@ Generate configuration based on user instruction.
 - **Model Loading Errors**: Ensure sufficient disk space and RAM
 - **CORS Errors**: Make sure Flask-CORS is installed and configured
 
-## 📝 License
-
-MIT
-
