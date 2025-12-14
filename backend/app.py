@@ -1,25 +1,31 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-import os
-import sys
-from dotenv import load_dotenv
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
-import uuid
-from sentence_transformers import SentenceTransformer
-from google import genai
-import numpy as np
-from typing import List, Dict
-import re
 import io
-import pdfplumber
+import json
+import os
+import re
+import sys
+import uuid
+from pathlib import Path
+from typing import Dict, List, Optional, cast
+
+import numpy as np
 import pandas as pd
+import pdfplumber
 from docx import Document
+from dotenv import load_dotenv
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from google import genai
+from pymongo import MongoClient
+from pymongo.collection import Collection as MongoCollection
+from pymongo.database import Database
+from pymongo.server_api import ServerApi
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
 app = Flask(__name__, static_folder='../frontend/build', static_url_path='')
 CORS(app)
+STATIC_ROOT = app.static_folder or str((Path(__file__).resolve().parents[1] / 'frontend' / 'build'))
 
 # Environment variables
 MONGODB_URI = os.getenv('MONGODB_URI')
@@ -31,17 +37,70 @@ GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 GEN_TEMPERATURE = float(os.getenv('GEN_TEMPERATURE', '0.2'))
 TOP_K = int(os.getenv('TOP_K', '5'))
 
+NAVIGATOR_PROMPT_TEMPLATE = """You are a Network Topology Resolver.
+Your ONLY job is to map the user's intent to specific "Nodes" and "Links" in the provided Topology JSON.
+
+TOPOLOGY JSON:
+{topology}
+
+USER INSTRUCTION:
+"{user_instruction}"
+
+INSTRUCTIONS:
+1. Analyze the User Instruction to identify which devices or links are being discussed.
+2. Search the Topology JSON to find the EXACT "alias" or "id" for these entities.
+   - If the user mentions two devices (e.g., "R1 and R2"), find the Link object that connects them.
+   - If the user implies a group (e.g., "all links to TGEN"), find ALL matching links.
+3. Return a JSON object with the following structure. Do NOT return markdown or explanation.
+
+OUTPUT FORMAT:
+{{
+  "intent_summary": "Brief description of what was found",
+  "entities": [
+    {{
+      "id": "The exact alias from the JSON (e.g., R1_R2_2)",
+      "type": "link" or "node",
+      "role": "The role in the request (e.g., primary, target, hop)",
+      "associated_devices": ["DeviceA", "DeviceB"]
+    }}
+  ]
+}}
+"""
+
+ENGINEER_PROMPT_TEMPLATE = """
+You are a Cisco IOS-XR Configuration Assistant.
+
+TOPOLOGY FACTS (The Target Interfaces):
+{topology_facts}
+
+TECHNICAL CONTEXT (RAG):
+{context_text}
+
+USER INSTRUCTION:
+"{user_instruction}"
+
+CRITICAL RULES:
+1. **ITERATE**: You must generate a configuration block for **EVERY** entity listed in TOPOLOGY FACTS.
+   - If the facts list 4 links, you must generate configuration for all 4 links.
+2. **USE ALIASES**: Use the 'id' value (e.g., "R1_R2_1") directly as the interface name.
+   - Example: "interface R1_R2_1"
+3. **APPLY CONFIG**: Do not just create global profiles. You must APPLY the feature to the specific interfaces.
+
+OUTPUT FORMAT:
+Generate the code inside a single markdown code block.
+"""
+
 # Initialize models
 print("Loading embedding model...")
 embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 print("✅ Embedding model loaded!")
 
 # Initialize Gemini client
+gemini_client: Optional[genai.Client] = None
 print("🔄 Initializing Gemini API client...")
 if not GEMINI_API_KEY:
     print("⚠️ Warning: GEMINI_API_KEY not found in environment variables")
     print("   Set it in your .env file or as an environment variable")
-    gemini_client = None
 else:
     try:
         # Set the API key as environment variable for the client
@@ -52,10 +111,57 @@ else:
         print(f"❌ Error initializing Gemini client: {e}")
         gemini_client = None
 
+# Load topology once at startup so every request can reuse it
+TOPOLOGY_CONTENT = None
+TOPOLOGY_DATA = None
+TOPOLOGY_PATH = Path(__file__).resolve().parent / 'sample_topology.json'
+
+try:
+    TOPOLOGY_CONTENT = TOPOLOGY_PATH.read_text(encoding='utf-8')
+    TOPOLOGY_DATA = json.loads(TOPOLOGY_CONTENT)
+    print(f"✅ Loaded topology map from {TOPOLOGY_PATH}")
+except FileNotFoundError:
+    print(f"❌ Topology file not found at {TOPOLOGY_PATH}. The application will continue without topology context.")
+except json.JSONDecodeError as e:
+    print(f"❌ Failed to parse topology JSON: {e}. File: {TOPOLOGY_PATH}")
+
+
+def resolve_topology_intent(user_instruction: str) -> str:
+    """Call Gemini Navigator to resolve nodes/links matching the user intent."""
+    clean_instruction = str(user_instruction or "").strip()
+    if not clean_instruction:
+        raise ValueError("user_instruction must be provided for topology resolution")
+    if gemini_client is None:
+        raise RuntimeError("Gemini API client not initialized. Cannot resolve topology intent.")
+
+    prompt = NAVIGATOR_PROMPT_TEMPLATE.format(
+        topology=TOPOLOGY_CONTENT or "{}",
+        user_instruction=clean_instruction
+    )
+
+    try:
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config={"temperature": GEN_TEMPERATURE},
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Navigator call failed: {exc}")
+
+    response_text = getattr(response, "text", "") or ""
+    text = response_text.strip()
+    # Remove markdown fences if the model wraps the JSON in ```json ... ```
+    if text.startswith("```"):
+        text = text.strip('`')
+        if text.lower().startswith('json'):
+            text = text[4:]
+        text = text.strip()
+    return text
+
 # MongoDB connection
-client = None
-db = None
-collection = None
+client: Optional[MongoClient] = None
+db: Optional[Database] = None
+collection: Optional[MongoCollection] = None
 
 if MONGODB_URI:
     try:
@@ -193,7 +299,7 @@ def chunk_text(text: str, source_id: str, file_type: str = 'text') -> List[Dict]
 def health_check():
     """Health check endpoint to verify MongoDB connection."""
     try:
-        if client is None or collection is None:
+        if client is None or collection is None or db is None:
             return jsonify({
                 'status': 'error', 
                 'message': 'MongoDB not connected',
@@ -206,10 +312,13 @@ def health_check():
             }), 500
         
         # Test connection
+        assert client is not None
         client.admin.command('ping')
         
         # Get collection stats
+        assert db is not None
         stats = db.command('collStats', MONGODB_COLLECTION)
+        assert collection is not None
         doc_count = collection.count_documents({})
         
         return jsonify({
@@ -278,11 +387,15 @@ def ingest():
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
     
+    if collection is None:
+        return jsonify({'error': 'MongoDB not connected'}), 500
+    mongo_collection: MongoCollection = collection
+
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
     
-    filename = file.filename
+    filename = file.filename or "uploaded_file"
     file_extension = filename.lower().split('.')[-1]
     
     # Supported file types
@@ -348,7 +461,7 @@ def ingest():
             }
             
             # Store in MongoDB
-            collection.insert_one(document)
+            mongo_collection.insert_one(document)
             stored_count += 1
         
         return jsonify({
@@ -369,6 +482,10 @@ def search_context():
     data = request.get_json()
     if not data or 'query' not in data:
         return jsonify({'error': 'No query provided'}), 400
+
+    if collection is None:
+        return jsonify({'error': 'MongoDB not connected'}), 500
+    mongo_collection: MongoCollection = collection
     
     query = data['query']
     top_k = int(data.get('top_k', TOP_K))
@@ -410,7 +527,7 @@ def search_context():
         
         # Try vector search, fallback to manual cosine similarity if index doesn't exist
         try:
-            results = list(collection.aggregate(pipeline_search))
+            results = list(mongo_collection.aggregate(pipeline_search))
             print(f"✅ Vector search successful, found {len(results)} results", flush=True)
             sys.stdout.flush()
         except Exception as e:
@@ -418,7 +535,7 @@ def search_context():
             print(f"⚠️ Vector search index not found, using manual cosine similarity", flush=True)
             print(f"Error: {e}", flush=True)
             
-            all_docs = list(collection.find({}, {'embedding': 1, 'text': 1, 'source_id': 1, 'chunk_id': 1, 'metadata': 1}))
+            all_docs = list(mongo_collection.find({}, {'embedding': 1, 'text': 1, 'source_id': 1, 'chunk_id': 1, 'metadata': 1}))
             print(f"📄 Total documents retrieved from DB: {len(all_docs)}", flush=True)
             
             if len(all_docs) == 0:
@@ -499,8 +616,18 @@ def generate_config():
     data = request.get_json()
     if not data or 'instruction' not in data:
         return jsonify({'error': 'No instruction provided'}), 400
+
+    if collection is None:
+        return jsonify({'error': 'MongoDB not connected'}), 500
+    mongo_collection: MongoCollection = collection
     
-    instruction = data['instruction']
+    instruction = data['instruction'] or ""
+
+    # Step 1: Navigator - resolve topology intent once per request
+    topology_facts = resolve_topology_intent(instruction)
+    print("\n=== TOPOLOGY FACTS (Navigator Output) ===", flush=True)
+    print(topology_facts, flush=True)
+    print("=== END TOPOLOGY FACTS ===\n", flush=True)
     
     try:
         # Embed the instruction
@@ -536,12 +663,12 @@ def generate_config():
         print(f"{'='*60}", flush=True)
         print(f"Instruction: {instruction}", flush=True)
         print(f"Top K: {TOP_K}", flush=True)
-        doc_count = collection.count_documents({})
+        doc_count = mongo_collection.count_documents({})
         print(f"Total documents in collection: {doc_count}", flush=True)
         sys.stdout.flush()
         
         try:
-            results = list(collection.aggregate(pipeline_search))
+            results = list(mongo_collection.aggregate(pipeline_search))
             print(f"✅ Vector search successful, found {len(results)} results", flush=True)
             sys.stdout.flush()
         except Exception as e:
@@ -549,7 +676,7 @@ def generate_config():
             print(f"⚠️ Vector search index not found, using manual cosine similarity", flush=True)
             print(f"Error: {e}", flush=True)
             
-            all_docs = list(collection.find({}, {'embedding': 1, 'text': 1, 'source_id': 1, 'chunk_id': 1, 'metadata': 1}))
+            all_docs = list(mongo_collection.find({}, {'embedding': 1, 'text': 1, 'source_id': 1, 'chunk_id': 1, 'metadata': 1}))
             print(f"📄 Total documents retrieved from DB: {len(all_docs)}", flush=True)
             
             if len(all_docs) == 0:
@@ -639,101 +766,7 @@ def generate_config():
         print(f"{'='*60}", flush=True)
         sys.stdout.flush()
 
-        current_topology  = """{
-            "topology": {
-                "description": "Two Cisco NCS 5000 routers with interconnection",
-                "routers": [
-                {
-                    "id": "R1",
-                    "hostname": "NCS5000-R1",
-                    "model": "NCS-5500",
-                    "management_ip": "10.0.0.1",
-                    "loopback0": "192.168.1.1/32",
-                    "interfaces": [
-                    {
-                        "name": "HundredGigE0/0/0/0",
-                        "description": "Link to R2",
-                        "ip_address": "10.1.1.1/30",
-                        "status": "up",
-                        "connected_to": {
-                        "router": "R2",
-                        "interface": "HundredGigE0/0/0/0"
-                        }
-                    },
-                    {
-                        "name": "MgmtEth0/RP0/CPU0/0",
-                        "description": "Management Interface",
-                        "ip_address": "10.0.0.1/24",
-                        "status": "up"
-                    }
-                    ]
-                },
-                {
-                    "id": "R2",
-                    "hostname": "NCS5000-R2",
-                    "model": "NCS-5500",
-                    "management_ip": "10.0.0.2",
-                    "loopback0": "192.168.1.2/32",
-                    "interfaces": [
-                    {
-                        "name": "HundredGigE0/0/0/0",
-                        "description": "Link to R1",
-                        "ip_address": "10.1.1.2/30",
-                        "status": "up",
-                        "connected_to": {
-                        "router": "R1",
-                        "interface": "HundredGigE0/0/0/0"
-                        }
-                    },
-                    {
-                        "name": "MgmtEth0/RP0/CPU0/0",
-                        "description": "Management Interface",
-                        "ip_address": "10.0.0.2/24",
-                        "status": "up"
-                    }
-                    ]
-                }
-                ],
-                "links": [
-                {
-                    "id": "link-1",
-                    "type": "point-to-point",
-                    "bandwidth": "100G",
-                    "endpoints": [
-                    {
-                        "router": "R1",
-                        "interface": "HundredGigE0/0/0/0",
-                        "ip": "10.1.1.1/30"
-                    },
-                    {
-                        "router": "R2",
-                        "interface": "HundredGigE0/0/0/0",
-                        "ip": "10.1.1.2/30"
-                    }
-                    ],
-                    "protocols": ["ISIS", "MPLS", "BGP"]
-                }
-                ],
-                "routing": {
-                "igp": "ISIS",
-                "bgp": {
-                    "as_number": 65000,
-                    "neighbors": [
-                    {
-                        "router": "R1",
-                        "peer": "192.168.1.2",
-                        "remote_as": 65000
-                    },
-                    {
-                        "router": "R2",
-                        "peer": "192.168.1.1",
-                        "remote_as": 65000
-                    }
-                    ]
-                }
-                }
-            }
-            }"""
+        current_topology  = TOPOLOGY_CONTENT or "{}"
         
         # ====================================================================
         # PROMPT CONSTRUCTION FOR LLM (Gemini API)
@@ -744,28 +777,11 @@ def generate_config():
 # {current_topology}
 
 
-        prompt = f"""You are a backend configuration-generation assistant.
-You write valid, ready-to-use configuration files or code blocks  specifically for IOS-XR devices for NCS series
-strictly following provided context. Do not invent unsupported fields.
-
-CONTEXT:
-{context_text}
-
-USER INSTRUCTION:
-{instruction}
-
-Current topology:
-{current_topology}
-
-
-OUTPUT FORMAT- GENERATE CONFIGURATION:
-- Return only the generated configuration/code inside proper fenced code blocks.
-- Mention which context chunks you referenced.
-
-If its a general explanation question, return the explanation based on the context added. Never use your own knowledge or experience to answer the question.
-OUTPUT FORMAT- GENERATE EXPLANATION:
- - Return only the explanation.
-"""
+        prompt = ENGINEER_PROMPT_TEMPLATE.format(
+            topology_facts=topology_facts or '{}',
+            context_text=context_text,
+            user_instruction=instruction
+        )
         # ====================================================================
         
         print(f"\n{'='*60}", flush=True)
@@ -791,10 +807,10 @@ OUTPUT FORMAT- GENERATE EXPLANATION:
                     "temperature": GEN_TEMPERATURE,
                 }
             )
-            generated_text = response.text
+            generated_text = getattr(response, "text", "") or ""
         except Exception as e:
             raise Exception(f"Error calling Gemini API: {str(e)}")
-        
+
         # Extract code blocks if present
         code_block_match = re.search(r'```[\w]*\n(.*?)```', generated_text, re.DOTALL)
         if code_block_match:
@@ -833,12 +849,13 @@ OUTPUT FORMAT- GENERATE EXPLANATION:
 @app.route('/<path:path>')
 def serve_frontend(path):
     """Serve React frontend."""
-    if path != "" and os.path.exists(app.static_folder + '/' + path):
-        return send_from_directory(app.static_folder, path)
+    static_root = STATIC_ROOT
+    target_path = os.path.join(static_root, path)
+    if path != "" and os.path.exists(target_path):
+        return send_from_directory(static_root, path)
     else:
-        return send_from_directory(app.static_folder, 'index.html')
+        return send_from_directory(static_root, 'index.html')
 
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
-
