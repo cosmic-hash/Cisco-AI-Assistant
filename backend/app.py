@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, cast
@@ -628,6 +629,8 @@ def generate_config():
     print("\n=== TOPOLOGY FACTS (Navigator Output) ===", flush=True)
     print(topology_facts, flush=True)
     print("=== END TOPOLOGY FACTS ===\n", flush=True)
+    print("⏳ Waiting 5 seconds before sending the next Gemini query...", flush=True)
+    time.sleep(5)
     
     try:
         # Embed the instruction

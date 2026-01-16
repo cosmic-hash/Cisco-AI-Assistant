@@ -1,0 +1,242 @@
+interface R1_R2_1
+ performance-measurement
+  delay-measurement
+   probe
+    measurement-mode one-way
+    tx-interval 1000000
+   anomaly-check upper-bound 5000 lower-bound 1000
+interface R1_R2_2
+ performance-measurement
+  delay-measurement
+   probe
+    measurement-mode one-way
+    tx-interval 1000000
+   anomaly-check upper-bound 5000 lower-bound 1000
+interface R1_R2_3
+ performance-measurement
+  delay-measurement
+   probe
+    measurement-mode one-way
+    tx-interval 1000000
+   anomaly-check upper-bound 5000 lower-bound 1000
+interface R1_R2_4
+ performance-measurement
+  delay-measurement
+   probe
+    measurement-mode one-way
+    tx-interval 1000000
+   anomaly-check upper-bound 5000 lower-bound 1000
+
+=== TOPOLOGY FACTS (Navigator Output) ===
+{
+  "intent_summary": "Found all links connecting R1 and R2 for performance measurement.",
+  "entities": [
+    {
+      "id": "R1_R2_1",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    },
+    {
+      "id": "R1_R2_2",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    },
+    {
+      "id": "R1_R2_3",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    },
+    {
+      "id": "R1_R2_4",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    }
+  ]
+}
+=== END TOPOLOGY FACTS ===
+
+
+============================================================
+🔍 SEARCHING FOR RELEVANT CONTEXT
+============================================================
+Instruction: Configure Performance Measurement between R1 and R2
+Top K: 5
+Total documents in collection: 1051
+✅ Vector search successful, found 5 results
+
+============================================================
+📋 RETRIEVAL RESULTS
+============================================================
+Number of results: 5
+
+============================================================
+📚 RETRIEVED CHUNKS FROM DATABASE (5 chunks)
+============================================================
+
+--- Chunk 1 ---
+Source: cli-RAG-PM.xlsx
+Score: 0.7425
+Text preview: [cite_start]RouterA (config-pm-dm-ep-probe) # measurement-mode one-way [cite: 2010]
+                                     flow-label explicit <val1> <val2> ...                     Router(config-pm-dm-e...
+Full text length: 965 characters
+
+--- Full Chunk 1 Text ---
+[cite_start]RouterA (config-pm-dm-ep-probe) # measurement-mode one-way [cite: 2010]
+                                     flow-label explicit <val1> <val2> ...                     Router(config-pm-dm-ep-probe)#                                  [cite_start]Configures explicit flow labels for endpoint delay probes. [cite: 2444, 2449]                              [cite_start]RP/0/RSP0/CPU0:ios(config-pm-dm-ep-probe) #flow-label explicit 100 200 300 [cite: 2449]
+                                          delay-profile interfaces default                                    Router(config)#                                        [cite_start]Configures the default delay profile for interfaces. [cite: 1297, 1904]                   [cite_start]RP/0/0/CPU0: router(config)# performance-measurement delay-profile interfaces default [cite: 1297]
+                                                                     probe                         Router(config-pm-dm-intf)#
+--- End Chunk 1 ---
+
+
+--- Chunk 2 ---
+Source: cli-RAG-PM.xlsx
+Score: 0.7195
+Text preview: upper and lower anomaly thresholds for link delay. [cite: 1890, 1901, 1906]             [cite_start]RP/0/0/CPU0: router(config-pm-dm-intf-adv)# anomaly-check upper-bound 5000 lower-bound 1000 [cite: 1...
+Full text length: 960 characters
+
+--- Full Chunk 2 Text ---
+upper and lower anomaly thresholds for link delay. [cite: 1890, 1901, 1906]             [cite_start]RP/0/0/CPU0: router(config-pm-dm-intf-adv)# anomaly-check upper-bound 5000 lower-bound 1000 [cite: 1906]
+                                                 delay-profile name <name>                          Router(config-perf-meas)#                                      [cite_start]Creates a named performance measurement delay profile. [cite: 1619, 1622]                                     [cite_start]Router(config)# performance-measurement delay-profile name profile2 [cite: 1622]
+                                           delay-profile sr-policy default                          Router(config-perf-meas)#                                       [cite_start]Configures the default delay profile for SR policies. [cite: 2552, 2575]                                 [cite_start]Router(config)# performance-measurement delay-profile sr-policy default [cite: 2575]
+--- End Chunk 2 ---
+
+
+--- Chunk 3 ---
+Source: cli-RAG-PM.xlsx
+Score: 0.7187
+Text preview: d policy. [cite: 1683]                                  [cite_start]Router (config-sr-te-color)# performance-measurement delay-measurement [cite: 1683]
+                                                ...
+Full text length: 982 characters
+
+--- Full Chunk 3 Text ---
+d policy. [cite: 1683]                                  [cite_start]Router (config-sr-te-color)# performance-measurement delay-measurement [cite: 1683]
+                                                 delay-profile name <name>             Router(config-sr-te-color-delay-meas)#                                            [cite_start]Applies a named delay profile to the on-demand policy. [cite: 1683]                                     [cite_start]Router (config-sr-te-color-delay-meas)# delay-profile name profile2 [cite: 1683]
+                                                   performance-measurement                        Router(config-sr-te-color)#                            [cite_start]Enters performance measurement configuration for the on-demand policy. [cite: 1752]                                                     [cite_start]Router (config-sr-te-color) performance-measurement [cite: 1752]
+                           liveness-detection liveness-profile name <name>
+--- End Chunk 3 ---
+
+
+--- Chunk 4 ---
+Source: cli-RAG-PM.xlsx
+Score: 0.7119
+Text preview: performance-measurement                                    Router(config)#                                            [cite_start]Enters performance measurement configuration mode. [cite: 194, 280]   ...
+Full text length: 953 characters
+
+--- Full Chunk 4 Text ---
+performance-measurement                                    Router(config)#                                            [cite_start]Enters performance measurement configuration mode. [cite: 194, 280]                                                                  [cite_start]Router(config)# performance-measurement [cite: 280]
+                                        endpoint ipv4 <ip_addr> [vrf WORD]                          Router(config-perf-meas)#                                            [cite_start]Configures a probe endpoint, with an optional VRF. [cite: 110, 195]                                                       [cite_start]RouterA (config-perf-meas)# endpoint ipv4 10.1.1.5 [cite: 195]
+                                      endpoint ipv6 <ipv6_addr> [vrf WORD]                          Router(config-perf-meas)#                                      [cite_start]Configures an IPv6 probe endpoint, with an optional VRF. [cite: 110, 282]
+--- End Chunk 4 ---
+
+
+--- Chunk 5 ---
+Source: cli-RAG-PM.xlsx
+Score: 0.7103
+Text preview: t delay-profile interfaces default [cite: 1297]
+                                                                     probe                         Router(config-pm-dm-intf)#                           ...
+Full text length: 999 characters
+
+--- Full Chunk 5 Text ---
+t delay-profile interfaces default [cite: 1297]
+                                                                     probe                         Router(config-pm-dm-intf)#                               [cite_start]Enters probe configuration submode for the interface delay profile. [cite: 1298]                                                           [cite_start]RP/0/0/CPU : router(config-pm-dm-intf)# probe [cite: 1298]
+                                                  measurement-mode one-way                   Router(config-pm-dm-intf-probe)#                                       [cite_start]Configures one-way delay measurement for link probes. [cite: 1283, 1299]                                 [cite_start]RP/0/0/CPU0: router(config-pm-dm-intf-probe) # measurement-mode one-way [cite: 1299]
+                                                        tx-interval <usec>                   Router(config-pm-dm-intf-probe)#                               [cite_start]Configures the interval for
+--- End Chunk 5 ---
+
+
+============================================================
+📝 CONTEXT TEXT LENGTH: 4937 characters
+============================================================
+
+============================================================
+💬 PROMPT TO BE SENT TO LLM
+============================================================
+Prompt length: 6242 characters
+Context chunks in prompt: 5
+
+--- Full Prompt ---
+
+You are a Cisco IOS-XR Configuration Assistant.
+
+TOPOLOGY FACTS (The Target Interfaces):
+{
+  "intent_summary": "Found all links connecting R1 and R2 for performance measurement.",
+  "entities": [
+    {
+      "id": "R1_R2_1",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    },
+    {
+      "id": "R1_R2_2",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    },
+    {
+      "id": "R1_R2_3",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    },
+    {
+      "id": "R1_R2_4",
+      "type": "link",
+      "role": "primary",
+      "associated_devices": ["R1", "R2"]
+    }
+  ]
+}
+
+TECHNICAL CONTEXT (RAG):
+<<<CHUNK 1>>>
+[cite_start]RouterA (config-pm-dm-ep-probe) # measurement-mode one-way [cite: 2010]
+                                     flow-label explicit <val1> <val2> ...                     Router(config-pm-dm-ep-probe)#                                  [cite_start]Configures explicit flow labels for endpoint delay probes. [cite: 2444, 2449]                              [cite_start]RP/0/RSP0/CPU0:ios(config-pm-dm-ep-probe) #flow-label explicit 100 200 300 [cite: 2449]
+                                          delay-profile interfaces default                                    Router(config)#                                        [cite_start]Configures the default delay profile for interfaces. [cite: 1297, 1904]                   [cite_start]RP/0/0/CPU0: router(config)# performance-measurement delay-profile interfaces default [cite: 1297]
+                                                                     probe                         Router(config-pm-dm-intf)#
+
+<<<CHUNK 2>>>
+upper and lower anomaly thresholds for link delay. [cite: 1890, 1901, 1906]             [cite_start]RP/0/0/CPU0: router(config-pm-dm-intf-adv)# anomaly-check upper-bound 5000 lower-bound 1000 [cite: 1906]
+                                                 delay-profile name <name>                          Router(config-perf-meas)#                                      [cite_start]Creates a named performance measurement delay profile. [cite: 1619, 1622]                                     [cite_start]Router(config)# performance-measurement delay-profile name profile2 [cite: 1622]
+                                           delay-profile sr-policy default                          Router(config-perf-meas)#                                       [cite_start]Configures the default delay profile for SR policies. [cite: 2552, 2575]                                 [cite_start]Router(config)# performance-measurement delay-profile sr-policy default [cite: 2575]
+
+<<<CHUNK 3>>>
+d policy. [cite: 1683]                                  [cite_start]Router (config-sr-te-color)# performance-measurement delay-measurement [cite: 1683]
+                                                 delay-profile name <name>             Router(config-sr-te-color-delay-meas)#                                            [cite_start]Applies a named delay profile to the on-demand policy. [cite: 1683]                                     [cite_start]Router (config-sr-te-color-delay-meas)# delay-profile name profile2 [cite: 1683]
+                                                   performance-measurement                        Router(config-sr-te-color)#                            [cite_start]Enters performance measurement configuration for the on-demand policy. [cite: 1752]                                                     [cite_start]Router (config-sr-te-color) performance-measurement [cite: 1752]
+                           liveness-detection liveness-profile name <name>
+
+<<<CHUNK 4>>>
+performance-measurement                                    Router(config)#                                            [cite_start]Enters performance measurement configuration mode. [cite: 194, 280]                                                                  [cite_start]Router(config)# performance-measurement [cite: 280]
+                                        endpoint ipv4 <ip_addr> [vrf WORD]                          Router(config-perf-meas)#                                            [cite_start]Configures a probe endpoint, with an optional VRF. [cite: 110, 195]                                                       [cite_start]RouterA (config-perf-meas)# endpoint ipv4 10.1.1.5 [cite: 195]
+                                      endpoint ipv6 <ipv6_addr> [vrf WORD]                          Router(config-perf-meas)#                                      [cite_start]Configures an IPv6 probe endpoint, with an optional VRF. [cite: 110, 282]
+
+<<<CHUNK 5>>>
+t delay-profile interfaces default [cite: 1297]
+                                                                     probe                         Router(config-pm-dm-intf)#                               [cite_start]Enters probe configuration submode for the interface delay profile. [cite: 1298]                                                           [cite_start]RP/0/0/CPU : router(config-pm-dm-intf)# probe [cite: 1298]
+                                                  measurement-mode one-way                   Router(config-pm-dm-intf-probe)#                                       [cite_start]Configures one-way delay measurement for link probes. [cite: 1283, 1299]                                 [cite_start]RP/0/0/CPU0: router(config-pm-dm-intf-probe) # measurement-mode one-way [cite: 1299]
+                                                        tx-interval <usec>                   Router(config-pm-dm-intf-probe)#                               [cite_start]Configures the interval for
+
+USER INSTRUCTION:
+"Configure Performance Measurement between R1 and R2"
+
+CRITICAL RULES:
+1. **ITERATE**: You must generate a configuration block for **EVERY** entity listed in TOPOLOGY FACTS.
+   - If the facts list 4 links, you must generate configuration for all 4 links.
+2. **USE ALIASES**: Use the 'id' value (e.g., "R1_R2_1") directly as the interface name.
+   - Example: "interface R1_R2_1"
+3. **APPLY CONFIG**: Do not just create global profiles. You must APPLY the feature to the specific interfaces.
+
+OUTPUT FORMAT:
+Generate the code inside a single markdown code block.
+
+
+--- End Prompt ---
+============================================================
+
+127.0.0.1 - - [13/Dec/2025 15:05:02] "POST /api/generate-config HTTP/1.1" 200 -
