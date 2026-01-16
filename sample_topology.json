@@ -1,0 +1,59 @@
+{
+  "Topology": {
+    "Nodes": {
+      "R1": {
+        "alias": "R1",
+        "custom": "R1"
+      },
+      "R2": {
+        "alias": "R2",
+        "custom": "R2"
+      },
+      "R3": {
+        "alias": "R3",
+        "custom": "R3"
+      },
+      "TGEN": {
+        "alias": "TGEN"
+      }
+    },
+    "Links": {
+      "R1_R2_1": {
+        "devices": ["R1", "R2"],
+        "alias": "R1_R2_1"
+      },
+      "R1_R2_2": {
+        "devices": ["R1", "R2"],
+        "alias": "R1_R2_2"
+      },
+      "R1_R2_3": {
+        "devices": ["R1", "R2"],
+        "alias": "R1_R2_3"
+      },
+      "R1_R2_4": {
+        "devices": ["R1", "R2"],
+        "alias": "R1_R2_4"
+      },
+      "R1_R3_1": {
+        "devices": ["R1", "R3"],
+        "alias": "R1_R3_1"
+      },
+      "R1_R3_2": {
+        "devices": ["R1", "R3"],
+        "alias": "R1_R3_2"
+      },
+      "R2_R3_1": {
+        "devices": ["R2", "R3"],
+        "alias": "R2_R3_1"
+      },
+      "R1_T1_1": {
+        "devices": ["R1", "TGEN"],
+        "alias": "R1_T1_1"
+      },
+      "R3_T1_1": {
+        "devices": ["R3", "TGEN"],
+        "alias": "R3_T1_1"
+      }
+    }
+  }
+}
